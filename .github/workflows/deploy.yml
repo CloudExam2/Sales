@@ -1,23 +1,61 @@
-name: Deploy Sales Service to ECR
+name: Sales Service CI/CD
 
 on:
   push:
     branches: [ "main" ]
-    paths:
-      - 'src/**'
-      - 'Dockerfile'
+  workflow_dispatch:
 
 env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: sales-service
 
 jobs:
-  deploy:
+  provision:
     runs-on: ubuntu-latest
-    steps:   
-      - name: Checkout Code
-        uses: actions/checkout@v4
+    defaults:
+      run:
+        working-directory: ./terraform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Terraform Init & Apply
+        run: |
+          terraform init
+          terraform apply -auto-approve
+        env:
+          TF_VAR_github_token: ${{ secrets.GH_PAT }}
 
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          
+      - name: Run Tests
+        # We set dummy env vars so the Cloud tests don't crash due to missing keys
+        env:
+          TICKETS_BUCKET: "test-bucket"
+          SQS_URL: "https://test-queue"
+        run: python -m pytest tests/
+
+  deploy:
+    needs: provision
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -30,25 +68,25 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build, Tag, and Push Image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: latest
+      - name: Build and Push
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker build -t ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest .
+          docker push ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
 
       - name: Update EC2 via SSM
         run: |
-            aws ssm send-command \
+          aws ssm send-command \
             --document-name "AWS-RunShellScript" \
             --instance-ids "${{ secrets.EC2_INSTANCE_ID }}" \
             --parameters 'commands=[
-            	"aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}",
-            	"docker pull ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest",
-            	"docker stop sales-app || true",
-            	"docker rm sales-app || true",
-            	"docker run -d --name sales-app -p 80:8080 ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest"
+              "aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}",
+              "docker pull ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest",
+              "docker stop sales-app || true",
+              "docker rm sales-app || true",
+              "docker run -d --name sales-app -p 80:8080 \
+                -e TICKETS_BUCKET=${{ vars.TICKETS_BUCKET }} \
+                -e SQS_URL=${{ vars.SQS_URL }} \
+                -e CATALOG_URL=http://<CATALOG_PRIVATE_IP>:8080 \
+                ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest"
             ]' \
             --region us-east-1
-         

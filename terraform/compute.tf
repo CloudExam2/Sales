@@ -1,48 +1,3 @@
-# Find current AWS Account ID
-data "aws_caller_identity" "current" {}
-
-# Find the existing Lambda Function URL by its name
-data "aws_lambda_function_url" "notification_url" {
-  function_name = "SalesNotificationHandler"
-}
-
-# Find the existing SQS Queue ARN
-data "aws_s3_bucket" "tickets" {
-  bucket = "iteso-tickets-377871695195"
-}
-
-# Find the existing ECR Repository URL
-data "aws_ecr_repository" "sales" {
-  name = "sales-service"
-}
-
-resource "aws_security_group" "sales_sg" {
-  name        = "sales-service-sg"
-  description = "Allow HTTP inbound"
-
-  ingress { 
-	from_port   = 22
-	to_port     = 22
-	protocol    = "tcp"
-	cidr_blocks = ["189.163.24.169/32"]
-	}
-
-	# Authorize HTTP access for the test script
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["189.163.24.169/32"]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
-
 resource "aws_instance" "sales_service" {
   ami                  = "ami-0440d3b780d96b29d" # Amazon Linux 2023
   instance_type        = "t2.micro"
@@ -68,4 +23,11 @@ resource "aws_instance" "sales_service" {
   tags = {
     Name = "Sales-Service"
   }
+}
+
+# Automating the Secret Update
+resource "github_actions_secret" "ec2_id" {
+  repository       = "Exam2-Sales"
+  secret_name      = "EC2_INSTANCE_ID"
+  plaintext_value  = aws_instance.sales_service.id
 }

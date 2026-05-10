@@ -11,7 +11,11 @@ class SalesNote(Base):
     send_address_id = Column(Integer, nullable=False)
     total = Column(DECIMAL(10, 2), default=0.00)
 
-    contents = relationship("NoteContent", back_populates="note", cascade="all, delete-orphan")
+    contents = relationship(
+        "NoteContent", 
+        back_populates="note", 
+        cascade="all, delete-orphan"
+    )
 
 class NoteContent(Base):
     __tablename__ = "note_contents"

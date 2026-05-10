@@ -5,7 +5,7 @@ from routers import sales
 # Generate tables (for local dev)
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Catalog Service")
+app = FastAPI(title="Sales Service")
 
 # Include Routers
 app.include_router(sales.router)
