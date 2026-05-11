@@ -2,9 +2,9 @@
 data "aws_caller_identity" "current" {}
 
 # Find the existing Lambda Function URL by its name
-data "aws_lambda_function_url" "notification_url" {
-  function_name = "SalesNotificationHandler"
-}
+# data "aws_lambda_function_url" "notification_url" {
+#   function_name = "SalesNotificationHandler"
+# }
 
 # Find the existing SQS Queue ARN
 data "aws_s3_bucket" "tickets" {

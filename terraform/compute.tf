@@ -16,7 +16,7 @@ resource "aws_instance" "sales_service" {
               # Pull and Run using dynamic Account ID and Lambda URL
               docker pull ${data.aws_caller_identity.current.account_id}.dkr.ecr.us-east-1.amazonaws.com/sales-service:latest
               docker run -d -p 80:8080 \
-                -e NOTIFICATION_URL=${data.aws_lambda_function_url.notification_url.function_url} \
+                # -e NOTIFICATION_URL=$${this_is_now_ignored_by_terraform} \
                 ${data.aws_caller_identity.current.account_id}.dkr.ecr.us-east-1.amazonaws.com/sales-service:latest
               EOF
 
