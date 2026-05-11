@@ -12,6 +12,8 @@ env:
 jobs:
   provision:
     runs-on: ubuntu-latest
+    outputs:
+      ec2_instance_id: ${{ steps.set-id.outputs.INSTANCE_ID }}
     defaults:
       run:
         working-directory: ./terraform
@@ -30,12 +32,16 @@ jobs:
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
       - name: Terraform Init & Apply
+        id: apply # Give this a name so we can reference it
         run: |
           terraform init
           terraform apply -auto-approve
         env:
           TF_VAR_github_repo: "InakiMedina/Sales" # TF_VAR_ prefix tells Terraform to map this to var.github_repo
           TF_VAR_github_token: ${{ secrets.GH_PAT }}
+      - name: Export EC2 ID
+        id: set-id
+        run: echo "INSTANCE_ID=$(terraform output -raw ec2_instance_id)" >> $GITHUB_OUTPUT
 
   test:
     runs-on: ubuntu-latest
@@ -84,7 +90,7 @@ jobs:
         run: |
           aws ssm send-command \
           --document-name "AWS-RunShellScript" \
-          --instance-ids "${{ secrets.EC2_INSTANCE_ID }}" \
+          --instance-ids "${{ needs.provision.outputs.ec2_instance_id }}" \
           --parameters 'commands=[
             "docker stop sales-app || true",
             "docker rm sales-app || true",
