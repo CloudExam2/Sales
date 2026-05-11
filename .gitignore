@@ -9,7 +9,6 @@ venv/
 .terraform/
 *.tfstate
 *.tfstate.backup
-*.tfvars
 .terraform.lock.hcl
 
 # Environment & Secrets
