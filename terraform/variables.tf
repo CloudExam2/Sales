@@ -4,7 +4,11 @@ variable "github_token" {
   sensitive   = true
 }
 
+variable "github_owner" {
+  description = "GitHub username or organization"
+  type        = string
+}
 variable "github_repo" {
-  description = "The GitHub repository in 'username/repo' format"
+  description = "The GitHub repository"
   type        = string
 }
