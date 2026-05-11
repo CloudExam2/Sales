@@ -24,6 +24,7 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "1.7.0" # Or your preferred version
+          terraform_wrapper: false # <--- ADD THIS LINE
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
