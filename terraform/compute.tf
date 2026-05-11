@@ -27,7 +27,7 @@ resource "aws_instance" "sales_service" {
 
 # Automating the Secret Update
 resource "github_actions_secret" "ec2_id" {
-  repository       = var.github_repository_name
+  repository       = var.github_repo
   secret_name      = "EC2_INSTANCE_ID"
   plaintext_value  = aws_instance.sales_service.id
 }

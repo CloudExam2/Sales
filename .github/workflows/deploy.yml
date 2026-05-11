@@ -34,6 +34,7 @@ jobs:
           terraform init
           terraform apply -auto-approve
         env:
+          TF_VAR_github_repo: "InakiMedina/Sales" # TF_VAR_ prefix tells Terraform to map this to var.github_repo
           TF_VAR_github_token: ${{ secrets.GH_PAT }}
 
   test:
