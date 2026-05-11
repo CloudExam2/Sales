@@ -1,8 +1,6 @@
 import sqlite3
 import pytest
 
-from Sales.src.crud.sales import save_sale
-
 def test_sqlite_connection():
     # Use an in-memory db for fast testing
     conn = sqlite3.connect(':memory:')
