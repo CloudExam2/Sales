@@ -18,5 +18,5 @@ terraform {
 # Configure the GitHub Provider
 provider "github" {
   token = var.github_token # Requires a Personal Access Token (PAT)
-  owner = "your-org-name"
+  owner = var.github_repo
 }
