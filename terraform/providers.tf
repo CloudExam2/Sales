@@ -1,6 +1,6 @@
 terraform {
   backend "s3" {
-    bucket         = "iteso-terraform-state-inaki-99" # Must be globally unique
+    bucket         = "iteso-terraform-state-inaki-69" # Must be globally unique
     key            = "notifications/terraform.tfstate"
     region         = "us-east-1"
   }
