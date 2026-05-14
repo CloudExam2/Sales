@@ -40,6 +40,7 @@ jobs:
         env:
           TF_VAR_github_repo: "InakiMedina/Sales" # TF_VAR_ prefix tells Terraform to map this to var.github_repo
           TF_VAR_github_token: ${{ secrets.GH_PAT }}
+          TF_VAR_tickets_bucket_name: ${{ vars.TICKETS_BUCKET_NAME }}
       - name: Export EC2 ID
         id: set-id
         run: echo "INSTANCE_ID=$(terraform output -raw ec2_instance_id)" >> $GITHUB_OUTPUT
@@ -96,7 +97,7 @@ jobs:
             "docker stop sales-app || true",
             "docker rm sales-app || true",
             "docker run -d --name sales-app -p 80:8080 \
-            -e TICKETS_BUCKET=${{ vars.TICKETS_BUCKET }} \
+            -e TICKETS_BUCKET=${{ vars.TICKETS_BUCKET_NAME }} \
             -e SQS_URL=${{ vars.SQS_URL }} \
             -e NOTIFICATION_URL=${{ secrets.NOTIFICATION_LAMBDA_URL }} \
             ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest"

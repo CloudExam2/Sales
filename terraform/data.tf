@@ -8,7 +8,7 @@ data "aws_caller_identity" "current" {}
 
 # Find the existing SQS Queue ARN
 data "aws_s3_bucket" "tickets" {
-  bucket = "iteso-tickets-377871695195"
+  bucket = var.tickets_bucket_name
 }
 
 # Find the existing ECR Repository URL
