@@ -52,7 +52,19 @@ jobs:
         id: set-outputs
         run: |
           echo "EC2_SALES_ID=$(terraform output -raw ec2_sales_id)" >> $GITHUB_OUTPUT
-          echo "SALES_IP=$(terraform output -raw sales_public_ip)" >> $GITHUB_OUTPUT
+          IP=$(terraform output -raw sales_public_ip)
+          echo "SALES_IP=${IP}" >> $GITHUB_OUTPUT
+          {
+            echo "## Sales — Elastic IP (stable URL)"
+            echo ""
+            echo "| | URL |"
+            echo "|--|-----|"
+            echo "| Health | http://${IP}/ |"
+            echo "| Swagger | http://${IP}/docs |"
+            echo "| Sales API | http://${IP}/sales/ |"
+            echo ""
+            echo "Also updates Core repo variable \`SALES_BACKEND_URL\` → \`http://${IP}:80\`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   test:
     runs-on: ubuntu-latest
