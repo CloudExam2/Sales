@@ -10,6 +10,7 @@ and the first five products already on Catalog (e.g. after Catalog test_seed_dat
 
 import os
 import random
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
@@ -272,10 +273,17 @@ def clear_catalog(catalog_url: str | None = None) -> None:
     print(f"  deleted addresses: {deleted_addresses}")
 
 
+def _load_rfc(index: int, run_tag: int) -> str:
+    """12–13 char RFC unique per run (avoids duplicate-key 500 after a failed load test)."""
+    # LD + 6-digit index + 4-digit run tag = 12 chars (schema allows 12–13)
+    return f"LD{i:06d}{run_tag:04d}"
+
+
 def _setup_catalog_for_load(
     catalog_url: str,
     num_clients: int,
     num_products: int,
+    run_tag: int,
 ) -> tuple[list[dict], list[int]]:
     """Create clients (with FAC/ENV addresses) and products. Returns buyers + product ids."""
     buyers: list[dict] = []
@@ -284,14 +292,17 @@ def _setup_catalog_for_load(
         c_res = requests.post(
             f"{catalog_url}/clients/",
             json={
-                "rfc": f"LDCL{i:08d}",
+                "rfc": _load_rfc(i, run_tag),
                 "razon_social": f"Load Buyer {i}",
                 "email": f"loadbuyer{i}@load.test",
             },
             timeout=30,
         )
         if c_res.status_code != 200:
-            raise RuntimeError(f"Load client {i} failed: {c_res.status_code} {c_res.text}")
+            raise RuntimeError(
+                f"Load client {i} failed: {c_res.status_code} {c_res.text!r}. "
+                "Try: python tests/test_clear_data.py (Catalog) or lower LOAD_CLIENTS in .env."
+            )
         client_id = c_res.json()["id"]
 
         fac_res = requests.post(
@@ -364,6 +375,11 @@ def load_test_then_clear(
     _check_reachable("SALES", sales_url)
     _check_reachable("CATALOG", catalog_url)
 
+    run_tag = int(time.time()) % 10000
+    print("  Clearing existing Sales + Catalog data before load...")
+    clear_sales(sales_url)
+    clear_catalog(catalog_url)
+
     print(f"Load test Sales @ {sales_url} (Catalog @ {catalog_url})")
     print(
         f"  clients={num_clients}, products={num_products}, sales_notes={num_sales}, "
@@ -372,7 +388,7 @@ def load_test_then_clear(
     print("  Watch CloudWatch dashboard Exam2-EC2-Overview (CPU on both EC2).")
 
     print("  Phase 1 — seed Catalog buyers + products...")
-    buyers, product_ids = _setup_catalog_for_load(catalog_url, num_clients, num_products)
+    buyers, product_ids = _setup_catalog_for_load(catalog_url, num_clients, num_products, run_tag)
     print(f"    {len(buyers)} buyers, {len(product_ids)} products")
 
     # Cache prices once (Sales still re-validates against Catalog on each POST).
