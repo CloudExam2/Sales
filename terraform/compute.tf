@@ -18,7 +18,9 @@ resource "aws_instance" "sales_service" {
       app_name   = "sales-app"
     }))
     cloudwatch_script = indent(2, templatefile("${path.module}/compute/cloudwatch.sh.tpl", {
-      cw_config = file("${path.module}/compute/cloudwatch_agent.json")
+      cw_config = templatefile("${path.module}/compute/cloudwatch_agent.json.tpl", {
+        log_group_name = data.terraform_remote_state.core.outputs.sales_log_group_name
+      })
     }))
   }))
 

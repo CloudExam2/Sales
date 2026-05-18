@@ -12,6 +12,7 @@ env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: sales-service
   CORE_REPO: "CloudExam2/Core"
+  SALES_LOG_GROUP: /exam2/sales
 
 jobs:
   terraform:
@@ -142,7 +143,7 @@ jobs:
               "aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}",
               "for i in 1 2 3 4 5; do docker pull ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest && break; echo pull attempt $i failed, retrying...; sleep 15; done",
               "docker rm -f sales-app 2>/dev/null || true",
-              "docker run -d --name sales-app -p 80:8000 -e CATALOG_SERVICE_URL=${{ env.CATALOG_URL }} ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest",
+              "docker run -d --name sales-app -p 80:8000 --log-driver awslogs --log-opt awslogs-region=${{ env.AWS_REGION }} --log-opt awslogs-group=${{ env.SALES_LOG_GROUP }} --log-opt awslogs-stream=sales-app -e CATALOG_SERVICE_URL=${{ env.CATALOG_URL }} ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest",
               "sleep 10",
               "docker ps -a",
               "curl -fsS --max-time 10 http://127.0.0.1/ || (docker logs sales-app 2>&1; exit 1)"
@@ -185,7 +186,31 @@ jobs:
             echo "## Sales is reachable on the public IP"
             echo ""
             echo "Open on your computer: **http://${IP}/** and **http://${IP}/docs**"
+            echo ""
+            echo "Logs → CloudWatch **\`${{ env.SALES_LOG_GROUP }}\`** (stream \`sales-app\`). Filter inter-service: \`sales.catalog\`"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify CloudWatch log stream
+        run: |
+          sleep 20
+          STREAMS=$(aws logs describe-log-streams \
+            --log-group-name "${{ env.SALES_LOG_GROUP }}" \
+            --order-by LastEventTime \
+            --descending \
+            --limit 3 \
+            --query "logStreams[*].logStreamName" \
+            --output text 2>/dev/null || true)
+          echo "Log streams in ${{ env.SALES_LOG_GROUP }}: ${STREAMS:-none yet}"
+          if [ -z "$STREAMS" ] || [ "$STREAMS" = "None" ]; then
+            echo "::warning::No log streams yet — run Core CI first (creates /exam2/sales), then Sales deploy. Check SSM for awslogs errors."
+          else
+            aws logs get-log-events \
+              --log-group-name "${{ env.SALES_LOG_GROUP }}" \
+              --log-stream-name "sales-app" \
+              --limit 5 \
+              --query "events[*].message" \
+              --output text 2>/dev/null || echo "(open CloudWatch → Log streams)"
+          fi
 
   verify-in-vpc:
     needs: [terraform, deploy]

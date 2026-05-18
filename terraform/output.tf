@@ -17,3 +17,8 @@ output "catalog_service_url" {
   description = "URL Sales will use to call Catalog (from Catalog remote state)."
   value       = data.terraform_remote_state.catalog.outputs.catalog_backend_url
 }
+
+output "sales_log_group_name" {
+  description = "CloudWatch Logs group for Sales (from Core remote state)"
+  value       = data.terraform_remote_state.core.outputs.sales_log_group_name
+}
