@@ -27,3 +27,4 @@ def test_openapi_available():
     assert spec.get("openapi")
     assert "paths" in spec
     assert "/sales/" in spec["paths"]
+    assert "/note-contents/" in spec["paths"]

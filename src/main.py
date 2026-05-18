@@ -1,13 +1,13 @@
 from fastapi import FastAPI
 from database import engine, Base
-from routers import sales
+from routers import note_contents, sales
 
 # Generate tables (for local dev)
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Sales Service")
 
-# Include Routers
+app.include_router(note_contents.router, prefix="/note-contents", tags=["note-contents"])
 app.include_router(sales.router, prefix="/sales", tags=["sales"])
 
 @app.get("/")

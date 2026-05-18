@@ -46,9 +46,11 @@ def patch_catalog(monkeypatch):
     async def _noop(_client_id, _product_ids):
         return None
 
+    import routers.note_contents as note_contents_router
     import routers.sales as sales_router
 
     monkeypatch.setattr(sales_router, "validate_catalog_entities", _noop)
+    monkeypatch.setattr(note_contents_router, "validate_catalog_entities", _noop)
 
 
 def _sample_note(folio: str = "F-001") -> dict:
@@ -114,3 +116,78 @@ def test_create_with_missing_folio_is_422():
     del bad["folio"]
     r = client.post("/sales/", json=bad)
     assert r.status_code == 422
+
+
+# ---------- Note contents (line items) ----------
+
+
+def _create_note_with_contents():
+    return client.post("/sales/", json=_sample_note("F-CONTENT")).json()
+
+
+def test_list_note_contents():
+    _create_note_with_contents()
+    listed = client.get("/note-contents/")
+    assert listed.status_code == 200
+    assert len(listed.json()) >= 2
+
+
+def test_create_note_content_updates_parent_total():
+    note = _create_note_with_contents()
+    before_total = float(note["total"])
+
+    r = client.post(
+        "/note-contents/",
+        json={
+            "note_id": note["id"],
+            "product_id": 102,
+            "unit_price": "10.00",
+            "quantity": 3,
+        },
+    )
+    assert r.status_code == 200, r.text
+    assert float(r.json()["total"]) == 30.00
+
+    updated_note = client.get(f"/sales/{note['id']}").json()
+    assert float(updated_note["total"]) == before_total + 30.00
+
+
+def test_get_note_content():
+    note = _create_note_with_contents()
+    listed = client.get("/note-contents/").json()
+    cid = listed[0]["id"]
+
+    r = client.get(f"/note-contents/{cid}")
+    assert r.status_code == 200
+    assert r.json()["note_id"] == note["id"]
+
+
+def test_update_note_content_recalculates_total():
+    note = _create_note_with_contents()
+    cid = client.get("/note-contents/").json()[0]["id"]
+
+    r = client.put(
+        f"/note-contents/{cid}",
+        json={"quantity": 10},
+    )
+    assert r.status_code == 200, r.text
+    assert float(r.json()["total"]) == float(r.json()["unit_price"]) * 10
+
+    updated_note = client.get(f"/sales/{note['id']}").json()
+    assert float(updated_note["total"]) > 0
+
+
+def test_delete_note_content():
+    note = _create_note_with_contents()
+    cid = client.get("/note-contents/").json()[0]["id"]
+
+    del_res = client.delete(f"/note-contents/{cid}")
+    assert del_res.status_code == 200
+
+    check = client.get(f"/note-contents/{cid}")
+    assert check.status_code == 404
+
+
+def test_get_nonexistent_note_content():
+    r = client.get("/note-contents/9999")
+    assert r.status_code == 404
