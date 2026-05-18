@@ -23,8 +23,22 @@ resource "aws_instance" "sales_service" {
               EOF
 
   tags = {
-    Name = "Sales-Service"
+    Name      = "Sales-Service"
+    ManagedBy = "terraform-sales"
   }
+}
+
+resource "aws_eip" "sales" {
+  domain = "vpc"
+  tags = {
+    Name      = "sales-service-eip"
+    ManagedBy = "terraform-sales"
+  }
+}
+
+resource "aws_eip_association" "sales" {
+  instance_id   = aws_instance.sales_service.id
+  allocation_id = aws_eip.sales.id
 }
 
 resource "github_actions_secret" "ec2_instance_id" {
@@ -37,5 +51,5 @@ resource "github_actions_variable" "sales_url_for_core" {
   provider      = github.core
   repository    = "Core"
   variable_name = "SALES_BACKEND_URL"
-  value         = "http://${aws_instance.sales_service.public_ip}:80"
+  value         = "http://${aws_eip.sales.public_ip}:80"
 }

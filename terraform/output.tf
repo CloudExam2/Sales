@@ -4,6 +4,6 @@ output "ec2_sales_id" {
 }
 
 output "sales_public_ip" {
-  description = "Public IPv4 of Catalog EC2 (use with http:// below)"
-  value       = aws_instance.sales_service.public_ip
+  description = "Stable public IPv4 (Elastic IP) for Sales"
+  value       = aws_eip.sales.public_ip
 }
