@@ -1,26 +1,26 @@
+# EC2 + EIP + GitHub wiring (scripts live in ./compute/)
+
 resource "aws_instance" "sales_service" {
-  ami                  = "ami-0440d3b780d96b29d" # Amazon Linux 2023
-  instance_type        = "t2.micro"
-    subnet_id              = data.terraform_remote_state.core.outputs.public_subnet_ids[0]
-  iam_instance_profile = "LabInstanceProfile"
+  ami                    = "ami-0440d3b780d96b29d" # Amazon Linux 2023 (us-east-1)
+  instance_type          = "t2.micro"
+  subnet_id              = data.terraform_remote_state.core.outputs.public_subnet_ids[0]
+  iam_instance_profile   = "LabInstanceProfile"
   vpc_security_group_ids = [aws_security_group.sales_sg.id]
 
-  user_data = <<-EOF
-              #!/bin/bash
-              set -e
-              dnf update -y
-              dnf install -y docker
-              systemctl enable --now docker
-              ACCOUNT_ID=${data.aws_caller_identity.current.account_id}
-              aws ecr get-login-password --region ${var.aws_region} | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.${var.aws_region}.amazonaws.com
-              docker pull $ACCOUNT_ID.dkr.ecr.${var.aws_region}.amazonaws.com/sales-service:latest || true
-              docker system prune -af || true
-              docker image prune -af || true
-              docker stop sales-app 2>/dev/null || true 
-              docker rm sales-app 2>/dev/null || true
-              docker run -d --name sales-app -p 80:8000 \
-                $ACCOUNT_ID.dkr.ecr.${var.aws_region}.amazonaws.com/sales-service:latest
-              EOF
+  user_data = base64encode(templatefile("${path.module}/compute/user_data.sh.tpl", {
+    aws_region        = var.aws_region
+    account_id        = data.aws_caller_identity.current.account_id
+    ecr_repo          = "sales-service"
+    docker_script     = indent(2, templatefile("${path.module}/compute/docker.sh.tpl", {
+      aws_region = var.aws_region
+      account_id = data.aws_caller_identity.current.account_id
+      ecr_repo   = "sales-service"
+      app_name   = "sales-app"
+    }))
+    cloudwatch_script = indent(2, templatefile("${path.module}/compute/cloudwatch.sh.tpl", {
+      cw_config = file("${path.module}/compute/cloudwatch_agent.json")
+    }))
+  }))
 
   tags = {
     Name      = "Sales-Service"
