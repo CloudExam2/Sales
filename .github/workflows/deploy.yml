@@ -19,6 +19,7 @@ jobs:
     outputs:
       ec2_sales_id: ${{ steps.set-outputs.outputs.EC2_SALES_ID }}
       sales_public_ip: ${{ steps.set-outputs.outputs.SALES_IP }}
+      catalog_service_url: ${{ steps.set-outputs.outputs.CATALOG_URL }}
     
     defaults:
       run:
@@ -54,6 +55,8 @@ jobs:
           echo "EC2_SALES_ID=$(terraform output -raw ec2_sales_id)" >> $GITHUB_OUTPUT
           IP=$(terraform output -raw sales_public_ip)
           echo "SALES_IP=${IP}" >> $GITHUB_OUTPUT
+          CATALOG_URL=$(terraform output -raw catalog_service_url 2>/dev/null || echo "")
+          echo "CATALOG_URL=${CATALOG_URL}" >> $GITHUB_OUTPUT
           {
             echo "## Sales — Elastic IP (stable URL)"
             echo ""
@@ -64,6 +67,13 @@ jobs:
             echo "| Sales API | http://${IP}/sales/ |"
             echo ""
             echo "Also updates Core repo variable \`SALES_BACKEND_URL\` → \`http://${IP}:80\`"
+            if [ -n "$CATALOG_URL" ]; then
+              echo ""
+              echo "Talks to Catalog at: \`${CATALOG_URL}\`"
+            else
+              echo ""
+              echo "::warning::Catalog URL not found — run Catalog CI first, then re-run Sales."
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
   test:
@@ -92,6 +102,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       INSTANCE_ID: ${{ needs.terraform.outputs.ec2_sales_id }}
+      CATALOG_URL: ${{ needs.terraform.outputs.catalog_service_url }}
 
     steps:
       - uses: actions/checkout@v4
@@ -127,7 +138,7 @@ jobs:
               "aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}",
               "for i in 1 2 3 4 5; do docker pull ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest && break; echo pull attempt $i failed, retrying...; sleep 15; done",
               "docker rm -f sales-app 2>/dev/null || true",
-              "docker run -d --name sales-app -p 80:8000 ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest",
+              "docker run -d --name sales-app -p 80:8000 -e CATALOG_SERVICE_URL=${{ env.CATALOG_URL }} ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest",
               "sleep 10",
               "docker ps -a",
               "curl -fsS --max-time 10 http://127.0.0.1/ || (docker logs sales-app 2>&1; exit 1)"

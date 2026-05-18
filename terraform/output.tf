@@ -12,3 +12,8 @@ output "sales_backend_url" {
   description = "Base URL written to Core SALES_BACKEND_URL"
   value       = "http://${aws_eip.sales.public_ip}:80"
 }
+
+output "catalog_service_url" {
+  description = "URL Sales will use to call Catalog (from Catalog remote state)."
+  value       = data.terraform_remote_state.catalog.outputs.catalog_backend_url
+}
