@@ -44,8 +44,9 @@ jobs:
       - name: Terraform Init
         run: terraform init
 
+      # Replace EC2 so user_data (CloudWatch agent) re-runs when agent config changes.
       - name: Terraform Plan
-        run: terraform plan -out=tfplan
+        run: terraform plan -replace=aws_instance.sales_service -out=tfplan
 
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan

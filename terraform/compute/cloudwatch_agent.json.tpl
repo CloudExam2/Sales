@@ -1,10 +1,17 @@
 {
   "agent": {
     "metrics_collection_interval": 60,
-    "run_as_user": "root"
+    "run_as_user": "root",
+    "append_dimensions": {
+      "InstanceId": "$${aws:InstanceId}"
+    }
   },
   "metrics": {
     "namespace": "Exam2/Sales",
+    "append_dimensions": {
+      "InstanceId": "$${aws:InstanceId}"
+    },
+    "aggregation_dimensions": [["InstanceId"]],
     "metrics_collected": {
       "mem": {
         "measurement": ["mem_used_percent"],

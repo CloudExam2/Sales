@@ -7,6 +7,8 @@ resource "aws_instance" "sales_service" {
   iam_instance_profile   = "LabInstanceProfile"
   vpc_security_group_ids = [aws_security_group.sales_sg.id]
 
+  user_data_replace_on_change = true
+
   user_data = base64encode(templatefile("${path.module}/compute/user_data.sh.tpl", {
     aws_region        = var.aws_region
     account_id        = data.aws_caller_identity.current.account_id
@@ -27,6 +29,10 @@ resource "aws_instance" "sales_service" {
   tags = {
     Name      = "Sales-Service"
     ManagedBy = "terraform-sales"
+  }
+
+  lifecycle {
+    create_before_destroy = true
   }
 }
 
