@@ -1,14 +1,10 @@
 from sqlalchemy.orm import Session
-from Sales.src.models import sales
-from schemas import sales as schema
 
-def save_sale(db: Session, sale_data: schema.SalesNoteCreate) -> sales.SalesNote:
-    # 1. Create the Database Object
-    db_sale = sales.SalesNote(folio=sale_data.folio, total=sale_data.total)
-    # 2. Add it to the session
-    db.add(db_sale)
-    # 3. Save it to the .db file
+from models import sales as models
+
+
+def save_sale(db: Session, db_note: models.SalesNote) -> models.SalesNote:
+    db.add(db_note)
     db.commit()
-    # 4. Refresh to get the generated ID
-    db.refresh(db_sale)
-    return db_sale
+    db.refresh(db_note)
+    return db_note

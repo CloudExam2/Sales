@@ -1,8 +1,10 @@
-import httpx
-from fastapi import HTTPException
+import os
 from typing import List
 
-CATALOG_SERVICE_URL = "http://localhost:8000" # Catalog service port
+import httpx
+from fastapi import HTTPException
+
+CATALOG_SERVICE_URL = os.getenv("CATALOG_SERVICE_URL", "http://localhost:8000").rstrip("/")
 
 async def validate_catalog_entities(client_id: int, product_ids: List[int]):
     async with httpx.AsyncClient() as client:

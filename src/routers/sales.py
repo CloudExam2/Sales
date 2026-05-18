@@ -1,11 +1,11 @@
-import Sales.src.models.sales as sales
-from schemas import sales as sales_schema
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from database import get_db
-from services import validate_catalog_entities
+
 from crud import sales as sales_crud
+from database import get_db
 from models import sales as models
+from schemas import sales as sales_schema
+from services import validate_catalog_entities
 
 router = APIRouter()
 
@@ -33,7 +33,7 @@ async def create_sales_note(note: sales_schema.SalesNoteCreate, db: Session = De
         db_contents.append(db_item)
 
     # 3. Save Sales Note
-    db_note = sales.SalesNote(
+    db_note = models.SalesNote(
         folio=note.folio,
         client_id=note.client_id,
         fac_address_id=note.fac_address_id,
