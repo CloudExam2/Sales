@@ -1,17 +1,10 @@
 {
   "agent": {
     "metrics_collection_interval": 60,
-    "run_as_user": "root",
-    "append_dimensions": {
-      "InstanceId": "$${aws:InstanceId}"
-    }
+    "run_as_user": "root"
   },
   "metrics": {
     "namespace": "Exam2/Sales",
-    "append_dimensions": {
-      "InstanceId": "$${aws:InstanceId}"
-    },
-    "aggregation_dimensions": [["InstanceId"]],
     "metrics_collected": {
       "mem": {
         "measurement": ["mem_used_percent"],
@@ -21,7 +14,7 @@
         "measurement": ["used_percent"],
         "metrics_collection_interval": 60,
         "resources": ["/"],
-        "ignore_file_system_types": ["tmpfs", "devtmpfs"]
+        "ignore_file_system_types": ["tmpfs", "devtmpfs", "overlay", "squashfs"]
       }
     }
   },

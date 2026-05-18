@@ -11,6 +11,7 @@ from sqlalchemy.pool import StaticPool
 
 from main import app
 from database import Base, get_db
+from models.sales import NoteContent, SalesNote
 
 SQLALCHEMY_DATABASE_URL = "sqlite://"
 engine = create_engine(
@@ -37,6 +38,14 @@ client = TestClient(app)
 def setup_db():
     Base.metadata.create_all(bind=engine)
     yield
+    # Ensure no sales / note_contents survive between tests (CI uses in-memory DB only).
+    db = TestingSessionLocal()
+    try:
+        db.query(NoteContent).delete()
+        db.query(SalesNote).delete()
+        db.commit()
+    finally:
+        db.close()
     Base.metadata.drop_all(bind=engine)
 
 
@@ -109,6 +118,16 @@ def test_delete_sales_note():
 
     check = client.get(f"/sales/{nid}")
     assert check.status_code == 404
+
+
+def test_delete_sales_note_removes_note_contents():
+    nid = client.post("/sales/", json=_sample_note("F-301")).json()["id"]
+    assert len(client.get("/note-contents/").json()) >= 2
+
+    client.delete(f"/sales/{nid}")
+
+    assert client.get(f"/sales/{nid}").status_code == 404
+    assert client.get("/note-contents/").json() == []
 
 
 def test_create_with_missing_folio_is_422():

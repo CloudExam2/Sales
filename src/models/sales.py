@@ -20,7 +20,7 @@ class SalesNote(Base):
 class NoteContent(Base):
     __tablename__ = "note_contents"
     id = Column(Integer, primary_key=True, index=True)
-    note_id = Column(Integer, ForeignKey("sales_notes.id"))
+    note_id = Column(Integer, ForeignKey("sales_notes.id", ondelete="CASCADE"), nullable=False)
     product_id = Column(Integer, nullable=False)
     unit_price = Column(DECIMAL(10, 2), nullable=False)
     quantity = Column(Integer, nullable=False)

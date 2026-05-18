@@ -222,21 +222,29 @@ def seed_sales(sales_url: str | None = None, catalog_url: str | None = None) -> 
 
 
 def clear_sales(sales_url: str | None = None) -> None:
-    """Delete every sales note. Catalog data is left alone."""
+    """Delete every note line and sales note (orphan lines first for SQLite safety)."""
     sales_url = (sales_url or get_sales_url()).rstrip("/")
     _check_reachable("SALES", sales_url)
 
-    notes = requests.get(f"{sales_url}/sales/", timeout=15).json()
-    deleted = 0
-    for note in notes:
+    deleted_lines = 0
+    for row in requests.get(f"{sales_url}/note-contents/", timeout=15).json():
+        r = requests.delete(f"{sales_url}/note-contents/{row['id']}", timeout=15)
+        if r.status_code == 200:
+            deleted_lines += 1
+
+    deleted_notes = 0
+    for note in requests.get(f"{sales_url}/sales/", timeout=15).json():
         r = requests.delete(f"{sales_url}/sales/{note['id']}", timeout=15)
         if r.status_code == 200:
-            deleted += 1
+            deleted_notes += 1
 
-    remaining = requests.get(f"{sales_url}/sales/", timeout=15).json()
+    lines_left = requests.get(f"{sales_url}/note-contents/", timeout=15).json()
+    notes_left = requests.get(f"{sales_url}/sales/", timeout=15).json()
     print(f"Cleared at {sales_url}")
-    print(f"  deleted notes: {deleted}")
-    print(f"  notes remaining: {len(remaining)}")
+    print(f"  deleted note lines: {deleted_lines}")
+    print(f"  deleted notes:      {deleted_notes}")
+    print(f"  lines remaining:    {len(lines_left)}")
+    print(f"  notes remaining:    {len(notes_left)}")
 
 
 def _delete_all_catalog(catalog_url: str, path: str) -> int:
