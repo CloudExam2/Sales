@@ -1,23 +1,25 @@
 resource "aws_instance" "sales_service" {
   ami                  = "ami-0440d3b780d96b29d" # Amazon Linux 2023
   instance_type        = "t2.micro"
+    subnet_id              = data.terraform_remote_state.core.outputs.public_subnet_ids[0]
   iam_instance_profile = "LabInstanceProfile"
   vpc_security_group_ids = [aws_security_group.sales_sg.id]
 
   user_data = <<-EOF
               #!/bin/bash
+              set -e
               dnf update -y
               dnf install -y docker
               systemctl enable --now docker
-              
-              # Authenticate using dynamic Account ID
-              aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.us-east-1.amazonaws.com
-              
-              # Pull and Run using dynamic Account ID and Lambda URL
-              docker pull ${data.aws_caller_identity.current.account_id}.dkr.ecr.us-east-1.amazonaws.com/sales-service:latest
-              docker run -d -p 80:8080 \
-                # -e NOTIFICATION_URL=$${this_is_now_ignored_by_terraform} \
-                ${data.aws_caller_identity.current.account_id}.dkr.ecr.us-east-1.amazonaws.com/sales-service:latest
+              ACCOUNT_ID=${data.aws_caller_identity.current.account_id}
+              aws ecr get-login-password --region ${var.aws_region} | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.${var.aws_region}.amazonaws.com
+              docker pull $ACCOUNT_ID.dkr.ecr.${var.aws_region}.amazonaws.com/sales-service:latest || true
+              docker system prune -af || true
+              docker image prune -af || true
+              docker stop sales-app 2>/dev/null || true 
+              docker rm sales-app 2>/dev/null || true
+              docker run -d --name sales-app -p 80:8000 \
+                $ACCOUNT_ID.dkr.ecr.${var.aws_region}.amazonaws.com/sales-service:latest
               EOF
 
   tags = {
@@ -25,9 +27,15 @@ resource "aws_instance" "sales_service" {
   }
 }
 
-# Automating the Secret Update
-resource "github_actions_secret" "ec2_id" {
-  repository       = var.github_repo
-  secret_name      = "EC2_INSTANCE_ID"
-  plaintext_value  = aws_instance.sales_service.id
+resource "github_actions_secret" "ec2_instance_id" {
+  repository      = var.github_repo
+  secret_name     = "EC2_SALES_ID"
+  plaintext_value = aws_instance.sales_service.id
+}
+
+resource "github_actions_variable" "sales_url_for_core" {
+  provider      = github.core
+  repository    = "Core"
+  variable_name = "SALES_BACKEND_URL"
+  value         = "http://${aws_instance.sales_service.public_ip}:80"
 }

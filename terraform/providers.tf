@@ -1,13 +1,15 @@
 terraform {
   backend "s3" {
-    bucket         = "iteso-terraform-state-inaki-69" # Must be globally unique
-    key            = "notifications/terraform.tfstate"
-    region         = "us-east-1"
+    bucket = "iteso-terraform-state-inaki-69"
+    key    = "sales/terraform.tfstate"
+    region = "us-east-1"
   }
-}
 
-terraform {
   required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
     github = {
       source  = "integrations/github"
       version = "~> 5.0"
@@ -15,8 +17,17 @@ terraform {
   }
 }
 
-# Configure the GitHub Provider
+provider "aws" {
+  region = var.aws_region
+}
+
 provider "github" {
-  token = var.github_token # Requires a Personal Access Token (PAT)
-  owner = var.github_owner # GitHub username or organization
+  token = var.github_token
+  owner = var.github_owner
+}
+
+provider "github" {
+  alias = "core"
+  token = var.github_token
+  owner = "CloudExam2"
 }

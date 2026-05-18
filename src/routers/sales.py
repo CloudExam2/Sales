@@ -7,7 +7,7 @@ from services import validate_catalog_entities
 from crud import sales as sales_crud
 from models import sales as models
 
-router = APIRouter(prefix="/sales", tags=["sales"])
+router = APIRouter()
 
 @router.post("/", response_model=sales_schema.SalesNoteRead)
 async def create_sales_note(note: sales_schema.SalesNoteCreate, db: Session = Depends(get_db)):

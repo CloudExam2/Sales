@@ -1,12 +1,9 @@
-output "sales_instance_id" {
-  value = aws_instance.sales_service.id
+output "ec2_sales_id" {
+  description = "EC2 instance ID for SSM deploy and debugging"
+  value       = aws_instance.sales_service.id
 }
 
 output "sales_public_ip" {
-  value = aws_instance.sales_service.public_ip
-}
-
-output "ec2_instance_id" {
-  description = "The ID of the EC2 instance for the Sales Service"
-  value       = aws_instance.sales_service.id
+  description = "Public IPv4 of Catalog EC2 (use with http:// below)"
+  value       = aws_instance.sales_service.public_ip
 }
