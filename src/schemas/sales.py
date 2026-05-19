@@ -10,10 +10,11 @@ class NoteContentBase(BaseModel):
     quantity: int
 
 
-class NoteContentLineCreate(NoteContentBase):
-    """Line item embedded in POST /sales/ (note_id is set by the parent note)."""
+class NoteContentLineCreate(BaseModel):
+    """Line item on POST /sales/ — unit_price is resolved from Catalog."""
 
-    pass
+    product_id: int
+    quantity: int
 
 
 class NoteContentCreate(NoteContentBase):

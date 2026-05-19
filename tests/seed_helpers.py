@@ -2,7 +2,7 @@
 
 Sales validates against Catalog, so seeding a sales note needs:
   1. CATALOG_BASE_URL  → client + 2 addresses + products (or reuse existing)
-  2. SALES_BASE_URL    → sales note; line unit_price is read from Catalog base_price
+  2. SALES_BASE_URL    → sales note (POST lines: product_id + quantity; Sales reads Catalog prices)
 
 Set USE_EXISTING_CATALOG=true in Sales/.env to use the first client, two addresses,
 and the first five products already on Catalog (e.g. after Catalog test_seed_data.py).
@@ -87,41 +87,54 @@ def _note_contents_from_catalog(
     product_ids: list[int],
     quantities: list[int],
 ) -> list[dict]:
-    """Build sale lines using each product's current base_price from Catalog."""
+    """Build POST /sales/ lines (product_id + quantity). Logs Catalog prices for visibility."""
     if len(product_ids) != len(quantities):
         raise ValueError("product_ids and quantities must have the same length")
 
     contents = []
     for pid, qty in zip(product_ids, quantities):
         prod = _get_catalog_product(catalog_url, pid)
-        contents.append(
-            {
-                "product_id": pid,
-                "unit_price": str(prod["base_price"]),
-                "quantity": qty,
-            }
-        )
+        contents.append({"product_id": pid, "quantity": qty})
         print(
             f"  line product_id={pid} name={prod.get('name')} "
-            f"unit_price={prod['base_price']} qty={qty}"
+            f"catalog_base_price={prod['base_price']} qty={qty}"
         )
     return contents
 
 
+_SALE_BUYER_RFC = "SALEBUYR1234"
+
+
+def _catalog_client_id_by_rfc(catalog_url: str, rfc: str) -> int | None:
+    clients = requests.get(f"{catalog_url}/clients/", timeout=15)
+    if clients.status_code != 200:
+        return None
+    for row in clients.json():
+        if row.get("rfc") == rfc:
+            return row["id"]
+    return None
+
+
+def _ensure_sale_demo_client(catalog_url: str) -> int:
+    """Create SALEBUYR1234 buyer or reuse if a previous seed run left it on Catalog."""
+    payload = {
+        "rfc": _SALE_BUYER_RFC,
+        "razon_social": "Sales Demo Buyer",
+        "email": "sale@buyer.test",
+    }
+    client_res = requests.post(f"{catalog_url}/clients/", json=payload, timeout=15)
+    if client_res.status_code == 200:
+        return client_res.json()["id"]
+    if client_res.status_code == 409:
+        existing = _catalog_client_id_by_rfc(catalog_url, _SALE_BUYER_RFC)
+        if existing is not None:
+            return existing
+    raise RuntimeError(f"Catalog client create failed: {client_res.status_code} {client_res.text}")
+
+
 def _seed_catalog_for_sale(catalog_url: str) -> tuple[int, int, int, list[int]]:
     """Create one buyer + 2 addresses + 5 products. Returns ids."""
-    client_res = requests.post(
-        f"{catalog_url}/clients/",
-        json={
-            "rfc": "SALEBUYR1234",
-            "razon_social": "Sales Demo Buyer",
-            "email": "sale@buyer.test",
-        },
-        timeout=15,
-    )
-    if client_res.status_code != 200:
-        raise RuntimeError(f"Catalog client create failed: {client_res.status_code} {client_res.text}")
-    client_id = client_res.json()["id"]
+    client_id = _ensure_sale_demo_client(catalog_url)
 
     fac_res = requests.post(
         f"{catalog_url}/addresses/",
@@ -179,7 +192,7 @@ def create_one_sale(
     sales_url: str | None = None,
     catalog_url: str | None = None,
     *,
-    folio: str = "F-NOTIFY-001",
+    folio: str | None = None,
 ) -> dict:
     """
     Create a single sales note (Catalog seed + one POST /sales/).
@@ -194,6 +207,9 @@ def create_one_sale(
         client_id, fac_id, env_id, product_ids = _pick_existing_catalog_entities(catalog_url)
     else:
         client_id, fac_id, env_id, product_ids = _seed_catalog_for_sale(catalog_url)
+
+    if folio is None:
+        folio = f"F-NOTIFY-{int(time.time())}"
 
     contents = _note_contents_from_catalog(
         catalog_url,
@@ -503,20 +519,11 @@ def load_test_then_clear(
     buyers, product_ids = _setup_catalog_for_load(catalog_url, num_clients, num_products, run_tag)
     print(f"    {len(buyers)} buyers, {len(product_ids)} products")
 
-    # Cache prices once (Sales still re-validates against Catalog on each POST).
-    product_prices = {
-        pid: str(_get_catalog_product(catalog_url, pid)["base_price"]) for pid in product_ids
-    }
-
     def _create_one_sale(i: int) -> None:
         buyer = buyers[i % len(buyers)]
         line_pids = random.sample(product_ids, min(lines_per_sale, len(product_ids)))
         contents = [
-            {
-                "product_id": pid,
-                "unit_price": product_prices[pid],
-                "quantity": 1 + (i % 4),
-            }
+            {"product_id": pid, "quantity": 1 + (i % 4)}
             for pid in line_pids
         ]
         payload = {

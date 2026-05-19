@@ -1,6 +1,7 @@
 import logging
 import os
 import time
+from decimal import Decimal
 from typing import List
 
 import httpx
@@ -39,6 +40,30 @@ async def _catalog_get(path: str) -> httpx.Response:
     return response
 
 
+async def get_catalog_product(product_id: int) -> dict:
+    """Fetch one product from Catalog (includes base_price)."""
+    try:
+        p_res = await _catalog_get(f"/products/{product_id}")
+    except httpx.HTTPError as e:
+        logger.warning("Catalog unreachable at %s: %s", CATALOG_SERVICE_URL, e)
+        raise HTTPException(status_code=502, detail=f"Catalog unreachable: {e}") from e
+
+    if p_res.status_code == 404:
+        logger.warning("catalog product_id=%s not found", product_id)
+        raise HTTPException(status_code=400, detail=f"Product {product_id} not found in Catalog")
+    if p_res.status_code != 200:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Catalog returned {p_res.status_code} for product {product_id}",
+        )
+    return p_res.json()
+
+
+async def get_catalog_base_price(product_id: int) -> Decimal:
+    product = await get_catalog_product(product_id)
+    return Decimal(str(product["base_price"]))
+
+
 async def validate_catalog_entities(client_id: int, product_ids: List[int]) -> None:
     """Confirm the client and every product exist in Catalog before saving a sale."""
     logger.info(
@@ -60,15 +85,7 @@ async def validate_catalog_entities(client_id: int, product_ids: List[int]) -> N
             )
 
         for p_id in product_ids:
-            p_res = await _catalog_get(f"/products/{p_id}")
-            if p_res.status_code == 404:
-                logger.warning("catalog validate product_id=%s not found", p_id)
-                raise HTTPException(status_code=400, detail=f"Product {p_id} not found in Catalog")
-            if p_res.status_code != 200:
-                raise HTTPException(
-                    status_code=502,
-                    detail=f"Catalog returned {p_res.status_code} for product {p_id}",
-                )
+            await get_catalog_product(p_id)
     except HTTPException:
         raise
     except httpx.HTTPError as e:

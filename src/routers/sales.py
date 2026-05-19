@@ -5,7 +5,7 @@ from crud import sales as sales_crud
 from database import get_db
 from models import sales as models
 from schemas import sales as sales_schema
-from services import validate_catalog_entities
+from services import get_catalog_base_price, validate_catalog_entities
 from sqs_notify import publish_sale_created
 
 router = APIRouter()
@@ -32,12 +32,13 @@ async def create_sales_note(note: sales_schema.SalesNoteCreate, db: Session = De
     grand_total = 0
     db_contents = []
     for item in note.contents:
-        line_total = item.unit_price * item.quantity
+        unit_price = await get_catalog_base_price(item.product_id)
+        line_total = unit_price * item.quantity
         grand_total += line_total
         db_contents.append(
             models.NoteContent(
                 product_id=item.product_id,
-                unit_price=item.unit_price,
+                unit_price=unit_price,
                 quantity=item.quantity,
                 total=line_total,
             )

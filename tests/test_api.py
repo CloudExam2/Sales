@@ -1,5 +1,7 @@
 """CRUD tests on in-memory SQLite. Catalog validation is monkeypatched to a no-op."""
 
+from decimal import Decimal
+
 import pytest
 
 pytestmark = pytest.mark.ephemeral
@@ -49,17 +51,30 @@ def setup_db():
     Base.metadata.drop_all(bind=engine)
 
 
+_CATALOG_PRICES = {
+    100: Decimal("45.50"),
+    101: Decimal("15.00"),
+    102: Decimal("10.00"),
+}
+
+
 @pytest.fixture(autouse=True)
 def patch_catalog(monkeypatch):
     """Skip the real Catalog HTTP call in API tests."""
     async def _noop(_client_id, _product_ids):
         return None
 
+    async def _mock_price(product_id: int) -> Decimal:
+        if product_id not in _CATALOG_PRICES:
+            raise RuntimeError(f"unexpected product_id in test: {product_id}")
+        return _CATALOG_PRICES[product_id]
+
     import routers.note_contents as note_contents_router
     import routers.sales as sales_router
 
     monkeypatch.setattr(sales_router, "validate_catalog_entities", _noop)
     monkeypatch.setattr(note_contents_router, "validate_catalog_entities", _noop)
+    monkeypatch.setattr(sales_router, "get_catalog_base_price", _mock_price)
     monkeypatch.setattr(sales_router, "publish_sale_created", lambda _note: None)
 
 
@@ -70,8 +85,8 @@ def _sample_note(folio: str = "F-001") -> dict:
         "fac_address_id": 10,
         "send_address_id": 20,
         "contents": [
-            {"product_id": 100, "unit_price": "45.50", "quantity": 2},
-            {"product_id": 101, "unit_price": "15.00", "quantity": 1},
+            {"product_id": 100, "quantity": 2},
+            {"product_id": 101, "quantity": 1},
         ],
     }
 

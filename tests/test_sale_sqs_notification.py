@@ -5,7 +5,7 @@ Prerequisites:
   - Core, Catalog, Sales, Notifications deployed
   - SNS subscription confirmed for Exam2-Sales-Notifications
   - Notifications Lambda has SQS event source mapping enabled
-  - Sales container has SQS_QUEUE_URL (Sales CI deploy sets from org variable)
+  - Sales container has SQS_QUEUE_URL (Sales CI deploy sets from Core terraform output)
 
   copy Sales/.env.example .env   # SALES_BASE_URL, CATALOG_BASE_URL
 

@@ -43,7 +43,6 @@ $product = Invoke-RestMethod -Uri "$CatalogUrl/products/" -Method Post -ContentT
     name = "Email Test Product"; unit = "unit"; base_price = 15.00
 } | ConvertTo-Json)
 
-$price = [string]$product.base_price
 $saleBody = @{
     folio            = "F-PS-EMAIL-$runTag"
     client_id        = $client.id
@@ -51,7 +50,6 @@ $saleBody = @{
     send_address_id  = $env.id
     contents         = @(@{
         product_id = $product.id
-        unit_price = $price
         quantity   = 1
     })
 } | ConvertTo-Json -Depth 5
