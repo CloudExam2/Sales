@@ -6,6 +6,7 @@ from database import get_db
 from models import sales as models
 from schemas import sales as sales_schema
 from services import validate_catalog_entities
+from sqs_notify import publish_sale_created
 
 router = APIRouter()
 
@@ -51,7 +52,9 @@ async def create_sales_note(note: sales_schema.SalesNoteCreate, db: Session = De
         contents=db_contents,
     )
 
-    return sales_crud.save_sale(db, db_note)
+    saved = sales_crud.save_sale(db, db_note)
+    publish_sale_created(saved)
+    return saved
 
 
 @router.delete("/{note_id}")

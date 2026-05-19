@@ -108,6 +108,7 @@ jobs:
     env:
       INSTANCE_ID: ${{ needs.terraform.outputs.ec2_sales_id }}
       CATALOG_URL: ${{ needs.terraform.outputs.catalog_service_url }}
+      SQS_QUEUE_URL: ${{ vars.SQS_QUEUE_URL }}
 
     steps:
       - uses: actions/checkout@v4
@@ -143,7 +144,7 @@ jobs:
               "aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}",
               "for i in 1 2 3 4 5; do docker pull ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest && break; echo pull attempt $i failed, retrying...; sleep 15; done",
               "docker rm -f sales-app 2>/dev/null || true",
-              "docker run -d --name sales-app -p 80:8000 --log-driver awslogs --log-opt awslogs-region=${{ env.AWS_REGION }} --log-opt awslogs-group=${{ env.SALES_LOG_GROUP }} --log-opt awslogs-stream=sales-app -e CATALOG_SERVICE_URL=${{ env.CATALOG_URL }} ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest",
+              "docker run -d --name sales-app -p 80:8000 --log-driver awslogs --log-opt awslogs-region=${{ env.AWS_REGION }} --log-opt awslogs-group=${{ env.SALES_LOG_GROUP }} --log-opt awslogs-stream=sales-app -e CATALOG_SERVICE_URL=${{ env.CATALOG_URL }} -e SQS_QUEUE_URL=${{ env.SQS_QUEUE_URL }} -e AWS_REGION=${{ env.AWS_REGION }} ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest",
               "sleep 10",
               "docker ps -a",
               "curl -fsS --max-time 10 http://127.0.0.1/ || (docker logs sales-app 2>&1; exit 1)"

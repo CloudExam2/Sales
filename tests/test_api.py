@@ -60,6 +60,7 @@ def patch_catalog(monkeypatch):
 
     monkeypatch.setattr(sales_router, "validate_catalog_entities", _noop)
     monkeypatch.setattr(note_contents_router, "validate_catalog_entities", _noop)
+    monkeypatch.setattr(sales_router, "publish_sale_created", lambda _note: None)
 
 
 def _sample_note(folio: str = "F-001") -> dict:

@@ -175,6 +175,44 @@ def _pick_existing_catalog_entities(catalog_url: str) -> tuple[int, int, int, li
     return client_id, fac["id"], env["id"], product_ids
 
 
+def create_one_sale(
+    sales_url: str | None = None,
+    catalog_url: str | None = None,
+    *,
+    folio: str = "F-NOTIFY-001",
+) -> dict:
+    """
+    Create a single sales note (Catalog seed + one POST /sales/).
+    Used by test_sale_sqs_notification.py to trigger SQS → Lambda → email.
+    """
+    sales_url = (sales_url or get_sales_url()).rstrip("/")
+    catalog_url = (catalog_url or get_catalog_url()).rstrip("/")
+    _check_reachable("SALES", sales_url)
+    _check_reachable("CATALOG", catalog_url)
+
+    if _use_existing_catalog():
+        client_id, fac_id, env_id, product_ids = _pick_existing_catalog_entities(catalog_url)
+    else:
+        client_id, fac_id, env_id, product_ids = _seed_catalog_for_sale(catalog_url)
+
+    contents = _note_contents_from_catalog(
+        catalog_url,
+        product_ids[:1],
+        [1],
+    )
+    payload = {
+        "folio": folio,
+        "client_id": client_id,
+        "fac_address_id": fac_id,
+        "send_address_id": env_id,
+        "contents": contents,
+    }
+    res = requests.post(f"{sales_url}/sales/", json=payload, timeout=60)
+    if res.status_code != 200:
+        raise RuntimeError(f"POST /sales/ failed: {res.status_code} {res.text}")
+    return res.json()
+
+
 def seed_sales(sales_url: str | None = None, catalog_url: str | None = None) -> dict:
     sales_url = (sales_url or get_sales_url()).rstrip("/")
     catalog_url = (catalog_url or get_catalog_url()).rstrip("/")
@@ -213,6 +251,7 @@ def seed_sales(sales_url: str | None = None, catalog_url: str | None = None) -> 
     print(f"  catalog client_id={client_id}, addresses=({fac_id}, {env_id})")
     print(f"  catalog product_ids={product_ids}")
     print(f"  sales note id={note['id']}, folio={note['folio']}, total={note['total']}")
+    print("  If SQS is configured on Sales EC2, check email for sale notification (SQS → Lambda → SNS).")
 
     return {
         "catalog_client_id": client_id,
