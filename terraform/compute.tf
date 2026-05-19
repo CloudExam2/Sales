@@ -10,19 +10,11 @@ resource "aws_instance" "sales_service" {
   user_data_replace_on_change = true
 
   user_data = base64encode(templatefile("${path.module}/compute/user_data.sh.tpl", {
-    aws_region        = var.aws_region
-    account_id        = data.aws_caller_identity.current.account_id
-    ecr_repo          = "sales-service"
-    docker_script     = indent(2, templatefile("${path.module}/compute/docker.sh.tpl", {
+    docker_script = indent(2, templatefile("${path.module}/compute/docker.sh.tpl", {
       aws_region = var.aws_region
       account_id = data.aws_caller_identity.current.account_id
       ecr_repo   = "sales-service"
       app_name   = "sales-app"
-    }))
-    cloudwatch_script = indent(2, templatefile("${path.module}/compute/cloudwatch.sh.tpl", {
-      cw_config = templatefile("${path.module}/compute/cloudwatch_agent.json.tpl", {
-        log_group_name = data.terraform_remote_state.core.outputs.sales_log_group_name
-      })
     }))
   }))
 

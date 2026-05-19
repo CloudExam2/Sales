@@ -2,4 +2,3 @@
 set -e
 
 ${docker_script}
-${cloudwatch_script}
