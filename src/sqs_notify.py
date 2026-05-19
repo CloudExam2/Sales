@@ -51,7 +51,7 @@ def publish_sale_created(note) -> bool:
     Skips quietly when SQS_QUEUE_URL is unset (local dev / tests).
     """
     if not SQS_QUEUE_URL:
-        logger.info("SQS_QUEUE_URL not set; skipping sale notification")
+        logger.warning("SQS_QUEUE_URL not set on Sales container; skipping sale notification email")
         return False
 
     body = sale_to_message(note)

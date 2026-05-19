@@ -388,7 +388,7 @@ def clear_catalog(catalog_url: str | None = None) -> None:
 def _load_rfc(index: int, run_tag: int) -> str:
     """12–13 char RFC unique per run (avoids duplicate-key 500 after a failed load test)."""
     # LD + 6-digit index + 4-digit run tag = 12 chars (schema allows 12–13)
-    return f"LD{i:06d}{run_tag:04d}"
+    return f"LD{index:06d}{run_tag:04d}"
 
 
 def _setup_catalog_for_load(

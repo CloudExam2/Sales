@@ -21,6 +21,7 @@ jobs:
       ec2_sales_id: ${{ steps.set-outputs.outputs.EC2_SALES_ID }}
       sales_public_ip: ${{ steps.set-outputs.outputs.SALES_IP }}
       catalog_service_url: ${{ steps.set-outputs.outputs.CATALOG_URL }}
+      sqs_queue_url: ${{ steps.set-outputs.outputs.SQS_QUEUE_URL }}
     
     defaults:
       run:
@@ -58,6 +59,11 @@ jobs:
           echo "SALES_IP=${IP}" >> $GITHUB_OUTPUT
           CATALOG_URL=$(terraform output -raw catalog_service_url 2>/dev/null || echo "")
           echo "CATALOG_URL=${CATALOG_URL}" >> $GITHUB_OUTPUT
+          SQS_URL=$(terraform output -raw sqs_queue_url 2>/dev/null || echo "")
+          echo "SQS_QUEUE_URL=${SQS_URL}" >> $GITHUB_OUTPUT
+          if [ -z "$SQS_URL" ]; then
+            echo "::warning::sqs_queue_url empty — run Core CI first (creates sales-ticket-queue). Sale emails will NOT work."
+          fi
           {
             echo "## Sales — Elastic IP (stable URL)"
             echo ""
@@ -108,7 +114,7 @@ jobs:
     env:
       INSTANCE_ID: ${{ needs.terraform.outputs.ec2_sales_id }}
       CATALOG_URL: ${{ needs.terraform.outputs.catalog_service_url }}
-      SQS_QUEUE_URL: ${{ vars.SQS_QUEUE_URL }}
+      SQS_QUEUE_URL: ${{ needs.terraform.outputs.sqs_queue_url }}
 
     steps:
       - uses: actions/checkout@v4
@@ -133,6 +139,14 @@ jobs:
             --query "InstanceInformationList[0].{PingStatus:PingStatus,AgentVersion:AgentVersion}" \
             --output table || echo "WARNING: instance not registered with SSM yet (wait a few minutes after first boot)"
 
+      - name: Check SQS queue URL for deploy
+        run: |
+          if [ -z "${{ env.SQS_QUEUE_URL }}" ]; then
+            echo "::error::SQS_QUEUE_URL is empty. Run Core CI, then Sales CI again."
+            exit 1
+          fi
+          echo "SQS_QUEUE_URL is set (from Core remote state)."
+
       - name: Update EC2 via SSM
         id: ssm_update
         run: |
@@ -147,7 +161,8 @@ jobs:
               "docker run -d --name sales-app -p 80:8000 --log-driver awslogs --log-opt awslogs-region=${{ env.AWS_REGION }} --log-opt awslogs-group=${{ env.SALES_LOG_GROUP }} --log-opt awslogs-stream=sales-app -e CATALOG_SERVICE_URL=${{ env.CATALOG_URL }} -e SQS_QUEUE_URL=${{ env.SQS_QUEUE_URL }} -e AWS_REGION=${{ env.AWS_REGION }} ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest",
               "sleep 10",
               "docker ps -a",
-              "curl -fsS --max-time 10 http://127.0.0.1/ || (docker logs sales-app 2>&1; exit 1)"
+              "curl -fsS --max-time 10 http://127.0.0.1/ || (docker logs sales-app 2>&1; exit 1)",
+              "docker exec sales-app printenv SQS_QUEUE_URL || echo MISSING_SQS_QUEUE_URL"
             ]' \
             --region ${{ env.AWS_REGION }} \
             --query "Command.CommandId" \

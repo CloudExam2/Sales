@@ -22,3 +22,8 @@ output "sales_log_group_name" {
   description = "CloudWatch Logs group for Sales (from Core remote state)"
   value       = data.terraform_remote_state.core.outputs.sales_log_group_name
 }
+
+output "sqs_queue_url" {
+  description = "Core sales-ticket-queue URL for sale notifications"
+  value       = try(data.terraform_remote_state.core.outputs.sqs_queue_url, "")
+}
