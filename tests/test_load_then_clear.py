@@ -9,7 +9,7 @@ Uses SALES_BASE_URL and CATALOG_BASE_URL from Sales/.env.
 Or: pytest tests/test_load_then_clear.py -v
 
 Does NOT run in CI. Each POST /sales/ hits Catalog (client + every product line).
-Watch CloudWatch → Exam2-EC2-Overview for CPU on Catalog and Sales.
+Watch CloudWatch → Exam2-EC2-Overview (CPU + HTTP %). Ends with 4xx/5xx traffic, then clears.
 """
 
 import pytest

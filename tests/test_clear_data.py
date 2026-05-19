@@ -12,13 +12,13 @@ Does NOT run in CI.
 
 import pytest
 
-from seed_helpers import clear_sales, get_sales_url
+from seed_helpers import clear_sales, get_catalog_url, get_sales_url
 
 pytestmark = pytest.mark.seed
 
 
 def test_clear_all_sales_notes():
-    clear_sales(get_sales_url())
+    clear_sales(get_sales_url(), get_catalog_url())
 
 
 if __name__ == "__main__":

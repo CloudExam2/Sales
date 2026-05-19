@@ -222,10 +222,83 @@ def seed_sales(sales_url: str | None = None, catalog_url: str | None = None) -> 
     }
 
 
-def clear_sales(sales_url: str | None = None) -> None:
+def emit_sales_http_errors(
+    sales_url: str | None = None,
+    catalog_url: str | None = None,
+    *,
+    buyer: dict | None = None,
+    product_ids: list[int] | None = None,
+    reps: int | None = None,
+) -> None:
+    """Send 404 / 422 / 400 / 500 traffic for CloudWatch HTTP % widgets."""
+    sales_url = (sales_url or get_sales_url()).rstrip("/")
+    catalog_url = (catalog_url or get_catalog_url()).rstrip("/")
+    reps = reps if reps is not None else _env_int("LOAD_ERROR_REPS", 40)
+    print(f"  HTTP error traffic @ {sales_url} ({reps} rounds)...")
+
+    bad_sale = {
+        "folio": "ERR-BAD-CATALOG",
+        "client_id": 999999999,
+        "fac_address_id": 888888888,
+        "send_address_id": 777777777,
+        "contents": [
+            {"product_id": 666666666, "unit_price": "10.00", "quantity": 1},
+        ],
+    }
+
+    for _ in range(reps):
+        requests.get(f"{sales_url}/sales/999999999", timeout=15)
+        requests.get(f"{sales_url}/note-contents/999999999", timeout=15)
+        requests.post(f"{sales_url}/sales/", json={}, timeout=15)
+        requests.post(f"{sales_url}/sales/", json=bad_sale, timeout=15)
+
+    if buyer and product_ids:
+        dup_folio = f"DUP-LOAD-{int(time.time()) % 100000}"
+        ok_payload = {
+            "folio": dup_folio,
+            "client_id": buyer["client_id"],
+            "fac_address_id": buyer["fac_address_id"],
+            "send_address_id": buyer["send_address_id"],
+            "contents": [
+                {
+                    "product_id": product_ids[0],
+                    "unit_price": "10.00",
+                    "quantity": 1,
+                }
+            ],
+        }
+        first = requests.post(f"{sales_url}/sales/", json=ok_payload, timeout=30)
+        if first.status_code == 200:
+            for _ in range(min(reps, 15)):
+                requests.post(f"{sales_url}/sales/", json=ok_payload, timeout=15)
+        else:
+            print(f"    (skip duplicate-folio 500 test: first sale returned {first.status_code})")
+
+    if catalog_url:
+        cat_rounds = min(reps, 20)
+        for _ in range(cat_rounds):
+            requests.get(f"{catalog_url}/clients/999999999", timeout=15)
+            requests.get(f"{catalog_url}/products/888888888", timeout=15)
+            requests.post(f"{catalog_url}/clients/", json={"rfc": "BAD"}, timeout=15)
+            requests.put(
+                f"{catalog_url}/clients/999999999",
+                json={"razon_social": "ghost"},
+                timeout=15,
+            )
+
+
+def clear_sales(
+    sales_url: str | None = None,
+    catalog_url: str | None = None,
+    *,
+    emit_errors: bool = True,
+) -> None:
     """Delete every note line and sales note (orphan lines first for SQLite safety)."""
     sales_url = (sales_url or get_sales_url()).rstrip("/")
+    catalog_url = (catalog_url or get_catalog_url()).rstrip("/")
     _check_reachable("SALES", sales_url)
+    if emit_errors:
+        emit_sales_http_errors(sales_url, catalog_url)
 
     deleted_lines = 0
     for row in requests.get(f"{sales_url}/note-contents/", timeout=15).json():
@@ -445,7 +518,15 @@ def load_test_then_clear(
             if done % 25 == 0:
                 print(f"    ... {done}/{http_rounds} rounds")
 
-    print("  Phase 4 — clearing Sales, then Catalog...")
-    clear_sales(sales_url)
-    clear_catalog(catalog_url)
+    print("  Phase 4 — HTTP errors for dashboard % (4xx/5xx)...")
+    emit_sales_http_errors(
+        sales_url,
+        catalog_url,
+        buyer=buyers[0] if buyers else None,
+        product_ids=product_ids,
+    )
+
+    print("  Phase 5 — clearing Sales, then Catalog...")
+    clear_sales(sales_url, catalog_url, emit_errors=False)
+    clear_catalog(catalog_url, emit_errors=False)
     print("  load test finished (Sales + Catalog cleared).")
